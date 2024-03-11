@@ -1,25 +1,49 @@
-import logo from './logo.svg';
-import './App.css';
+import React from "react";
+import {
+    BrowserRouter as Router,
+    Switch,
+    Route /*, Redirect*/,
+} from "react-router-dom";
 
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+import Home from "./pages/Home";
+import About from "./pages/About";
+import AuthPages from "./pages/Auth";
+import Contact from "./pages/Contact";
+import NavbarMenu from "./components/NavbarMenu";
+import Footer from "./components/Footer";
+
+//  commented out for future use
+/*
+const ProtectedRoute = ({ component: Component, ...rest }) => {
+    const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+
+    return (
+        <Route
+            {...rest}
+            render={(props) =>
+                isAuthenticated ? (
+                    <Component {...props} />
+                ) : (
+                    <Redirect to="/auth/login" />
+                )
+            }
+        />
+    );
+};
+*/
+
+export default function App() {
+    return (
+        <Router>
+            <NavbarMenu />
+            <Switch>
+                <Route exact path="/" component={Home} />
+                <Route path="/about" component={About} />
+                <Route path="/auth" component={AuthPages} />
+                <Route path="/contact" component={Contact} />
+                {/* <ProtectedRoute path="/dashboard" component={dashboard} /> */}
+            </Switch>
+            <Footer />
+        </Router>
+    );
 }
-
-export default App;

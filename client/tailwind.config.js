@@ -28,7 +28,7 @@ function Example() {
 */
 
 module.exports = {
-    content: [],
+    content: ["./src/**/*.{js,jsx,ts,tsx,html}", "./public/index.html"],
     theme: {
         extend: {
             fontFamily: {
@@ -62,7 +62,13 @@ module.exports = {
                     DEFAULT: "#370031", // Use for footer or less prominent elements that require subtlety
                 },
             },
+            gridTemplateRows: { "[auto,auto,1fr]": "auto auto 1fr" },
+            textShadow: { default: "2px 2px 4px rgba(0, 0, 0, 0.5)" },
         },
     },
-    plugins: [],
+    plugins: [
+        require("@tailwindcss/aspect-ratio"),
+        require("@tailwindcss/forms"),
+        require("@tailwindcss/typography"),
+    ],
 };
