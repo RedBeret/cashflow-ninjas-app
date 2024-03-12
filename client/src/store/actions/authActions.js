@@ -4,7 +4,7 @@ export const authenticateUser =
     async (dispatch, getState) => {
         dispatch({ type: "AUTH_START" });
         try {
-            const response = await fetch("/api/login", {
+            const response = await fetch("/api/flask/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username, password }),
@@ -24,10 +24,10 @@ export const authenticateUser =
             });
 
             setSuccess("Login successful");
-            const { chat } = getState();
-            if (chat.messages.length === 0) {
-            } else {
-            }
+            // const { chat } = getState();
+            // if (chat.messages.length === 0) {
+            // } else {
+            // }
         } catch (error) {
             console.error("Error during login:", error);
             dispatch({ type: "AUTH_FAIL" });
@@ -37,7 +37,7 @@ export const authenticateUser =
 
 export const checkLoginSession = () => async (dispatch) => {
     try {
-        const response = await fetch("/api/check_session", {
+        const response = await fetch("/api/flask/check_session", {
             method: "GET",
             credentials: "include",
         });
@@ -70,7 +70,7 @@ export const registerUser =
     (userData, setError, setSuccess, history) => async (dispatch) => {
         dispatch({ type: "AUTH_START" });
         try {
-            const response = await fetch("/api/user_auth", {
+            const response = await fetch("/api/flask/user_auth", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(userData),
@@ -96,7 +96,7 @@ export const updatePassword =
     async (dispatch) => {
         dispatch({ type: "AUTH_START" });
         try {
-            const response = await fetch("/api/user_auth", {
+            const response = await fetch("/api/flask/user_auth", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
@@ -126,7 +126,7 @@ export const deleteUser =
     (username, password, setError, setSuccess, history) => async (dispatch) => {
         dispatch({ type: "AUTH_START" });
         try {
-            const response = await fetch("/api/user_auth", {
+            const response = await fetch("/api/flask/user_auth", {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
@@ -153,7 +153,7 @@ export const deleteUser =
 export const logoutUser = (history) => async (dispatch) => {
     dispatch({ type: "AUTH_START" });
     try {
-        const response = await fetch("/api/logout", {
+        const response = await fetch("/api/flask/logout", {
             method: "POST",
             credentials: "include",
         });

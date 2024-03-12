@@ -34,7 +34,10 @@ export default function Register() {
 
         dispatch(registerUser(values, setError, setSuccess)).then(() => {
             if (!error) {
-                history.push("/login");
+                setTimeout(() => {
+                    history.push("/auth/login");
+                    setSubmitting(false);
+                }, 2000);
             }
             setSubmitting(false);
         });
