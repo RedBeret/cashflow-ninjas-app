@@ -180,7 +180,7 @@ $ ruby -v
 We recommend version 2.7.4. If you need to upgrade you can install it using rvm:
 
 ```console
-$ rvm install 2.7.4 --default
+$ rvm install 3.1.0 --default
 ```
 
 You should also install the latest versions of `bundler` and `rails`:
