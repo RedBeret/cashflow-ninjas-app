@@ -12,33 +12,10 @@
 
 ActiveRecord::Schema.define(version: 2024_03_13_005755) do
 
-  create_table "chat_messages", force: :cascade do |t|
-    t.integer "user_id", null: false
-    t.text "message", null: false
-    t.text "response"
-    t.datetime "timestamp", null: false
-    t.integer "session_id"
-  end
-
   create_table "test_models", force: :cascade do |t|
     t.string "name"
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
   end
 
-  create_table "user_auth", force: :cascade do |t|
-    t.string "username", limit: 255, null: false
-    t.string "email", limit: 255, null: false
-    t.string "password_hash", limit: 255, null: false
-  end
-
-  create_table "user_sessions", force: :cascade do |t|
-    t.integer "user_id", null: false
-    t.datetime "started_at", null: false
-    t.datetime "ended_at"
-  end
-
-  add_foreign_key "chat_messages", "user_auth", column: "user_id"
-  add_foreign_key "chat_messages", "user_sessions", column: "session_id"
-  add_foreign_key "user_sessions", "user_auth", column: "user_id"
 end
