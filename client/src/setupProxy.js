@@ -24,4 +24,13 @@ module.exports = function (app) {
             },
         })
     );
+
+    // Proxy all other requests to the backend server on port 4000
+    app.use(
+        "/api",
+        createProxyMiddleware({
+            target: "http://localhost:4000",
+            changeOrigin: true,
+        })
+    );
 };

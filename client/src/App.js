@@ -11,7 +11,7 @@ import AuthPages from "./pages/Auth";
 import Contact from "./pages/Contact";
 import NavbarMenu from "./components/NavbarMenu";
 import Footer from "./components/Footer";
-
+import FinancialProfileForm from "./pages/FinancialProfileForm";
 //  commented out for future use
 /*
 const ProtectedRoute = ({ component: Component, ...rest }) => {
@@ -41,6 +41,10 @@ export default function App() {
                 <Route path="/about" component={About} />
                 <Route path="/auth" component={AuthPages} />
                 <Route path="/contact" component={Contact} />
+                <Route
+                    path="/FinancialProfileForm"
+                    component={FinancialProfileForm}
+                />
                 {/* <ProtectedRoute path="/dashboard" component={dashboard} /> */}
             </Switch>
             <Footer />
