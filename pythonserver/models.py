@@ -1,117 +1,62 @@
-# Utilizes Flask-SQLAlchemy for ORM, Bcrypt for password hashing, and custom validation methods to ensure data integrity.
-
 import re
+import uuid
 from datetime import datetime
 
-from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy import ForeignKey, Text
+from sqlalchemy.dialects.sqlite import BLOB
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import validates
+from sqlalchemy.orm import relationship, validates
 from sqlalchemy_serializer import SerializerMixin
 
 from config import bcrypt, db
 
+Base = declarative_base()
 
-class UserAuth(db.Model, SerializerMixin):
-    """
-    UserAuth Model: Manages user authentication data and relations.
 
-    Fields:
-    - id: Primary key.
-    - username: Unique username for user identification.
-    - email: User's email address.
-    - password_hash: Hashed password for secure storage.
-
-    Relations:
-    - chat_messages: User's chat history.
-
-    Validations:
-    - email and username are validated for length and format.
-
-    Security:
-    - Passwords are hashed using bcrypt upon setting to ensure secure storage.
-    - Password field is write-only to prevent unauthorized access.
-    """
-
+class UserAuth(Base, db.Model, SerializerMixin):
     __tablename__ = "user_auth"
 
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(255), unique=True, nullable=False)
-    email = db.Column(db.String(255), nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
+    can_view_all_accounts = db.Column(db.Boolean, default=False)
+    mfa_enabled = db.Column(db.Boolean, default=False)
 
-    chat_messages = db.relationship(
-        "ChatMessage", back_populates="user", cascade="all, delete-orphan"
-    )
-    sessions = db.relationship(
-        "UserSession", back_populates="user", cascade="all, delete-orphan"
-    )
+    chat_messages = relationship("ChatMessage", back_populates="user")
+    sessions = relationship("UserSession", back_populates="user")
+    financial_profiles = relationship("FinancialProfile", back_populates="user")
+    family_id = db.Column(db.Integer, db.ForeignKey("family.id"))
+    family = db.relationship("Family", back_populates="members")
 
-    @validates("email")
-    def validate_email(self, key, address):
-        """
-        Validates the email address to ensure it follows a general email format and length.
-
-        This validation is crucial for maintaining data integrity and ensuring that user notifications,
-        password resets, and other communications are sent to a valid email address. The validation
-        checks include ensuring the email address is at least 3 characters long and matches a basic
-        pattern for email addresses. This is a simplistic check aimed at catching obvious errors, and
-        it may be adjusted to use more sophisticated regex patterns or external validation libraries
-        for comprehensive email validation in a production environment.
-        """
-        assert len(address) >= 3, f"{key} must be at least 3 characters long"
-        assert re.match(
-            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", address
-        ), "Invalid email format"
-        return address
-
-    @validates("username")
-    def validate_username(self, key, value):
-        """
-        Validates the username format and length.
-        """
-        assert len(value) >= 3, f"{key} must be at least 3 characters long"
+    @validates("email", "username")
+    def validate_field(self, key, value):
+        if key == "email":
+            assert len(value) >= 3, "Email must be at least 3 characters long"
+            assert re.match(
+                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", value
+            ), "Invalid email format"
+        elif key == "username":
+            assert len(value) >= 3, "Username must be at least 3 characters long"
         return value
 
     @hybrid_property
     def password(self):
-        """
-        Ensures password field is write-only for security reasons
-        """
         raise AttributeError("password is not a readable attribute")
 
     @password.setter
     def password(self, password):
-        """
-        Hashes the password before storing it in the database.
-        """
         self.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
 
     def check_password(self, password):
-        """
-        Verifies password against the hash stored in the database
-        """
         return bcrypt.check_password_hash(self.password_hash, password)
 
-    serialize_rules = (
-        "-password_hash",
-        "-chat_messages.user",
-    )
+    serialize_rules = ("-password_hash",)
 
 
-class UserSession(db.Model, SerializerMixin):
-    """
-    UserSession Model: Tracks user login sessions.
-
-    Fields:
-    - id: Primary key, auto-incremented. Used to identify the session uniquely.
-    - user_id: Foreign key linking to the UserAuth model. Identifies the user owning the session.
-    - started_at: Timestamp when the user logged in and the session was initiated.
-    - ended_at: Timestamp when the user logged out, marking the session's end. Nullable, as sessions might be ongoing.
-
-    Relations:
-    - user: Defines the relationship back to the UserAuth model, allowing easy access to the user's data from a session.
-    """
-
+class UserSession(Base, db.Model, SerializerMixin):
     __tablename__ = "user_sessions"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -119,35 +64,156 @@ class UserSession(db.Model, SerializerMixin):
     started_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     ended_at = db.Column(db.DateTime, nullable=True)
 
-    user = db.relationship("UserAuth", back_populates="sessions")
-
-    def __repr__(self):
-        return f"<UserSession {self.id} User ID: {self.user_id}>"
+    user = relationship("UserAuth", back_populates="sessions")
 
 
-class ChatMessage(db.Model, SerializerMixin):
-    """
-    Captures messages exchanged between the user and the system, including both user queries and system responses.
-
-    Attributes:
-    - id: Unique identifier for each chat message.
-    - user_id: Links to the UserAuth model to identify the message's sender.
-    - message: The content of the user's message.
-    - response: The system's response to the user's message.
-    - timestamp: The date and time when the message was exchanged.
-    """
-
+class ChatMessage(Base, db.Model, SerializerMixin):
     __tablename__ = "chat_messages"
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user_auth.id"), nullable=False)
-    message = db.Column(db.Text, nullable=False)
-    response = db.Column(db.Text, nullable=True)
+    message = db.Column(Text, nullable=False)
+    response = db.Column(Text, nullable=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    session_id = db.Column(db.Integer, db.ForeignKey("user_sessions.id"), nullable=True)
-    session = db.relationship("UserSession", backref="chat_messages")
 
-    user = db.relationship("UserAuth", back_populates="chat_messages")
+    user = relationship("UserAuth", back_populates="chat_messages")
 
-    def __repr__(self):
-        return f"<ChatMessage {self.id} User ID: {self.user_id}>"
+
+class Family(Base, db.Model, SerializerMixin):
+    __tablename__ = "family"
+    id = db.Column(db.Integer, primary_key=True)
+    family_name = db.Column(db.String(255), nullable=False)
+    members = db.relationship("UserAuth", back_populates="family")
+
+
+class BankAccount(Base, db.Model, SerializerMixin):
+    __tablename__ = "bank_accounts"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_number = db.Column(db.String(20))
+    account_name = db.Column(db.String(255))
+    available_balance = db.Column(db.Float)
+    debt = db.Column(db.Float)
+
+    family_bank_accounts = relationship(
+        "FamilyBankAccount", back_populates="bank_account"
+    )
+    user_bank_accounts = relationship("UserBankAccount", back_populates="bank_account")
+    transactions = relationship("Transaction", back_populates="bank_account")
+
+
+class FamilyBankAccount(Base, db.Model, SerializerMixin):
+    __tablename__ = "family_bank_accounts"
+
+    family_id = db.Column(db.String(36), ForeignKey("family.id"), primary_key=True)
+    account_id = db.Column(
+        db.String(36), ForeignKey("bank_accounts.id"), primary_key=True
+    )
+
+    family = relationship("Family", back_populates="family_bank_accounts")
+    bank_account = relationship("BankAccount", back_populates="family_bank_accounts")
+
+
+class UserBankAccount(Base, db.Model, SerializerMixin):
+    __tablename__ = "user_bank_accounts"
+
+    user_id = db.Column(db.String(36), ForeignKey("users.id"), primary_key=True)
+    account_id = db.Column(
+        db.String(36), ForeignKey("bank_accounts.id"), primary_key=True
+    )
+
+    user = relationship("UserAuth", back_populates="user_bank_accounts")
+    bank_account = relationship("BankAccount", back_populates="user_bank_accounts")
+
+
+class Transaction(Base, db.Model, SerializerMixin):
+    __tablename__ = "transactions"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_id = db.Column(db.String(36), ForeignKey("bank_accounts.id"))
+    amount = db.Column(db.Float)
+    transaction_type = db.Column(db.String(50))
+    category_id = db.Column(db.String(36), ForeignKey("categories.id"))
+    description = db.Column(Text)
+    transaction_date = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    bank_account = relationship("BankAccount", back_populates="transactions")
+    category = relationship("Category", back_populates="transactions")
+
+
+class Category(Base, db.Model, SerializerMixin):
+    __tablename__ = "categories"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = db.Column(db.String(255))
+    description = db.Column(Text)
+
+    transactions = relationship("Transaction", back_populates="category")
+
+
+class UserGoal(Base, db.Model, SerializerMixin):
+    __tablename__ = "user_goals"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(36), ForeignKey("users.id"))
+    goal_name = db.Column(db.String(255))
+    goal_amount = db.Column(db.Float)
+    current_amount = db.Column(db.Float)
+    deadline = db.Column(db.DateTime)
+
+    user = relationship("UserAuth", back_populates="user_goals")
+
+
+class FamilyInvitation(Base, db.Model, SerializerMixin):
+    __tablename__ = "family_invitations"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    family_id = db.Column(db.String(36), ForeignKey("families.id"))
+    invited_email = db.Column(db.String(255), nullable=False)
+    token = db.Column(db.String(255))
+    accepted = db.Column(db.Boolean, default=False)
+    sent_at = db.Column(db.DateTime)
+    accepted_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    family = relationship("Family", back_populates="family_invitations")
+
+
+class AccountIntegration(Base, db.Model, SerializerMixin):
+    __tablename__ = "account_integrations"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(36), ForeignKey("users.id"))
+    provider_name = db.Column(db.String(255))
+    access_token = db.Column(db.String(255))
+    refresh_token = db.Column(db.String(255))
+    expires_in = db.Column(db.BigInteger)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    user = relationship("UserAuth", back_populates="account_integrations")
+
+
+class FinancialProfile(Base, db.Model, SerializerMixin):
+    __tablename__ = "financial_profiles"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user_auth.id"), nullable=False)
+    annual_income = db.Column(db.Float)
+    monthly_income = db.Column(db.Float)
+    monthly_expenses = db.Column(db.JSON)
+    savings_goal = db.Column(db.Float)
+    current_savings = db.Column(db.Float)
+    savings_goal_deadline = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    user = relationship("UserAuth", back_populates="financial_profiles")

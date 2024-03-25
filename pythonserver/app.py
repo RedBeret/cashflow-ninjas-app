@@ -1,14 +1,26 @@
+import logging
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 
 import bcrypt
+import openai
+from dotenv import find_dotenv, load_dotenv
 from flask import jsonify, make_response, render_template, request, session
 from flask_bcrypt import Bcrypt
 from flask_marshmallow import fields
 from flask_restful import Resource
 from marshmallow import fields, validate
-from models import ChatMessage, UserAuth, UserSession
+from models import (
+    ChatMessage,
+    Family,
+    FinancialProfile,
+    Transaction,
+    UserAuth,
+    UserSession,
+    db,
+)
 
 from config import api, app, db, ma
 
@@ -31,6 +43,8 @@ bcrypt = Bcrypt(app)
 
 script_dir = Path(__file__).parent
 file_path = script_dir / "data" / "support_guide.txt"
+client = openai.OpenAI()
+model = "gpt-3.5-turbo-16k"
 
 
 @app.route("/")
@@ -45,21 +59,24 @@ def not_found(e):
 
 # User Authentication Resources
 # ------------------------------
+class FamilySchema(ma.SQLAlchemyAutoSchema):
+    members = fields.Nested(
+        "UserAuthSchema", many=True, exclude=("family", "family_id")
+    )
+
+    class Meta:
+        model = Family
+        load_instance = True
 
 
 class UserAuthSchema(ma.SQLAlchemyAutoSchema):
-    """
-    Marshmallow schema for serializing and deserializing UserAuth instances.
-    Facilitates user input validation upon registration and formats output for API responses.
-    Excludes the password_hash field from serialization for security.
-    """
+    family = fields.Nested(FamilySchema, exclude=("members",))
 
     class Meta:
         model = UserAuth
         load_instance = True
-        exclude = ("password_hash",)  # Excludes sensitive information from the output.
+        exclude = ("password_hash",)
 
-    # Ensures passwords are at least 6 characters long, enhancing basic security.
     password = fields.Str(
         load_only=True, required=True, validate=validate.Length(min=6)
     )
@@ -75,6 +92,12 @@ class UserAuthResource(Resource):
         users = UserAuth.query.all()
         user_schema = UserAuthSchema(many=True, only=["id", "username", "email"])
         return make_response(jsonify(user_schema.dump(users)), 200)
+
+
+class UserAuthResource(Resource):
+    """
+    RESTful resource for managing UserAuth entities, supporting operations like retrieval, creation, and deletion of user accounts.
+    """
 
     def post(self):
         """Creates a new user account with provided username, email, and password."""
@@ -105,8 +128,14 @@ class UserAuthResource(Resource):
 
         hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
 
+        # Include default values for is_admin, can_view_all_accounts, and mfa_enabled
         new_user = UserAuth(
-            username=username, email=email, password_hash=hashed_password
+            username=username,
+            email=email,
+            password_hash=hashed_password,
+            is_admin=False,
+            can_view_all_accounts=False,
+            mfa_enabled=False,
         )
         db.session.add(new_user)
         db.session.commit()
@@ -130,6 +159,9 @@ class UserAuthResource(Resource):
                     "username": new_user.username,
                     "email": new_user.email,
                     "session_id": new_user_session.id,
+                    "is_admin": new_user.is_admin,
+                    "can_view_all_accounts": new_user.can_view_all_accounts,
+                    "mfa_enabled": new_user.mfa_enabled,
                 }
             ),
             201,
@@ -192,14 +224,11 @@ class UserLoginResource(Resource):
             )
 
         user = UserAuth.query.filter_by(username=data["username"].lower()).first()
-        if user and user.check_password(
-            data["password"]
-        ):  # Utilize the check_password method of the UserAuth model
+        if user and user.check_password(data["password"]):
             session["user_id"] = user.id
             session["username"] = user.username
             session["logged_in"] = True
 
-            # Create a new UserSession instance
             new_user_session = UserSession(
                 user_id=user.id, started_at=datetime.utcnow()
             )
@@ -214,6 +243,9 @@ class UserLoginResource(Resource):
                 "username": user.username,
                 "email": user.email,
                 "session_id": new_user_session.id,
+                "is_admin": user.is_admin,
+                "can_view_all_accounts": user.can_view_all_accounts,
+                "mfa_enabled": user.mfa_enabled,
             }
 
             return make_response(jsonify(response_data), 200)
@@ -416,6 +448,145 @@ def continue_last_conversation():
         messages.extend([user_message, ai_response])
 
     return jsonify({"session_id": last_session.id, "messages": messages}), 200
+
+
+@app.route("/api/families", methods=["GET", "POST"])
+def handle_families():
+    if request.method == "GET":
+        families = Family.query.all()
+        families_data = [
+            {"id": family.id, "family_name": family.family_name} for family in families
+        ]
+        return jsonify(families_data)
+
+    if request.method == "POST":
+        data = request.get_json()
+        family_name = data.get("family_name")
+
+        if not family_name:
+            return jsonify({"error": "Missing family name"}), 400
+
+        new_family = Family(family_name=family_name)
+        db.session.add(new_family)
+        db.session.commit()
+
+        return (
+            jsonify({"id": new_family.id, "family_name": new_family.family_name}),
+            201,
+        )
+
+
+@app.route("/api/transactions", methods=["GET", "POST"])
+def handle_transactions():
+    if request.method == "GET":
+        transactions = Transaction.query.all()
+        transactions_data = [
+            {
+                "id": transaction.id,
+                "account_id": transaction.account_id,
+                "amount": transaction.amount,
+                "transaction_type": transaction.transaction_type,
+                "category_id": transaction.category_id,
+                "description": transaction.description,
+                "transaction_date": transaction.transaction_date.isoformat(),
+            }
+            for transaction in transactions
+        ]
+        return jsonify(transactions_data)
+
+    if request.method == "POST":
+        data = request.get_json()
+        account_id = data.get("account_id")
+        amount = data.get("amount")
+        transaction_type = data.get("transaction_type")
+        category_id = data.get("category_id")
+        description = data.get("description")
+        transaction_date = data.get("transaction_date", datetime.utcnow())
+
+        if not all([account_id, amount, transaction_type, category_id, description]):
+            return jsonify({"error": "Missing required transaction details"}), 400
+
+        new_transaction = Transaction(
+            account_id=account_id,
+            amount=amount,
+            transaction_type=transaction_type,
+            category_id=category_id,
+            description=description,
+            transaction_date=datetime.strptime(transaction_date, "%Y-%m-%dT%H:%M:%S"),
+        )
+        db.session.add(new_transaction)
+        db.session.commit()
+
+        return (
+            jsonify(
+                {
+                    "id": new_transaction.id,
+                    "account_id": new_transaction.account_id,
+                    "amount": new_transaction.amount,
+                    "transaction_type": new_transaction.transaction_type,
+                    "category_id": new_transaction.category_id,
+                    "description": new_transaction.description,
+                    "transaction_date": new_transaction.transaction_date.isoformat(),
+                }
+            ),
+            201,
+        )
+
+
+@app.route("/api/financial_profiles", methods=["GET"])
+def get_financial_profile():
+    if "user_id" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+
+    user_id = session["user_id"]
+    financial_profile = FinancialProfile.query.filter_by(user_id=user_id).first()
+    if not financial_profile:
+        return jsonify({"error": "Financial profile not found"}), 404
+
+    profile_data = {
+        "annual_income": financial_profile.annual_income,
+        "monthly_income": financial_profile.monthly_income,
+        "savings_goal": financial_profile.savings_goal,
+        "current_savings": financial_profile.current_savings,
+        "savings_goal_deadline": financial_profile.savings_goal_deadline.strftime(
+            "%Y-%m-%d"
+        ),
+    }
+
+    return jsonify(profile_data)
+
+
+@app.route("/api/financial_profiles", methods=["POST"])
+def create_financial_profile():
+    if "user_id" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+
+    data = request.json
+    required_fields = [
+        "annual_income",
+        "monthly_income",
+        "savings_goal",
+        "current_savings",
+        "savings_goal_deadline",
+    ]
+    if not all(field in data for field in required_fields):
+        return jsonify({"error": "Missing required financial profile details"}), 400
+
+    user_id = session["user_id"]
+    financial_profile = FinancialProfile(
+        user_id=user_id,
+        annual_income=data["annual_income"],
+        monthly_income=data["monthly_income"],
+        savings_goal=data["savings_goal"],
+        current_savings=data["current_savings"],
+        savings_goal_deadline=datetime.strptime(
+            data["savings_goal_deadline"], "%Y-%m-%d"
+        ),
+    )
+    db.session.add(financial_profile)
+    db.session.commit()
+
+    return jsonify({"message": "Financial profile created successfully"}), 201
 
 
 api.add_resource(UserLoginResource, "/api/login")
