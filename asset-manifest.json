@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/cashflow-ninjas-app/static/css/main.848491a4.css",
-    "main.js": "/cashflow-ninjas-app/static/js/main.0f33c195.js",
+    "main.js": "/cashflow-ninjas-app/static/js/main.8b3728d8.js",
     "static/js/453.462efd91.chunk.js": "/cashflow-ninjas-app/static/js/453.462efd91.chunk.js",
     "static/media/moneymagnet-logo.png": "/cashflow-ninjas-app/static/media/moneymagnet-logo.10b4c8878515ddd7c0fa.png",
     "static/media/slick.svg": "/cashflow-ninjas-app/static/media/slick.2630a3e3eab21c607e21.svg",
@@ -10,11 +10,11 @@
     "static/media/slick.woff": "/cashflow-ninjas-app/static/media/slick.295183786cd8a1389865.woff",
     "index.html": "/cashflow-ninjas-app/index.html",
     "main.848491a4.css.map": "/cashflow-ninjas-app/static/css/main.848491a4.css.map",
-    "main.0f33c195.js.map": "/cashflow-ninjas-app/static/js/main.0f33c195.js.map",
+    "main.8b3728d8.js.map": "/cashflow-ninjas-app/static/js/main.8b3728d8.js.map",
     "453.462efd91.chunk.js.map": "/cashflow-ninjas-app/static/js/453.462efd91.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.848491a4.css",
-    "static/js/main.0f33c195.js"
+    "static/js/main.8b3728d8.js"
   ]
 }
