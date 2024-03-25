@@ -71,7 +71,7 @@ export default function NavbarMenu() {
                             <div className="py-4 px-4">
                                 <nav className="space-y-4">
                                     <Link
-                                        to="/"
+                                        to="/cashflow-ninjas-app"
                                         onClick={handleCloseMenu}
                                         className="block text-gray-800 hover:text-gray-900"
                                     >
@@ -171,7 +171,7 @@ export default function NavbarMenu() {
                         </div>
                         <div className="hidden lg:flex lg:space-x-8">
                             <Link
-                                to="/"
+                                to="/cashflow-ninjas-app"
                                 className="flex items-center text-sm font-medium text-black hover:text-gray-300 ml-4" // Added ml-4 for left margin
                             >
                                 Home

@@ -38,7 +38,7 @@ export default function Footer() {
                         <ul className="mt-4 space-y-2">
                             <li>
                                 <Link
-                                    to="/"
+                                    to="/cashflow-ninjas-app"
                                     className="text-gray-600 hover:text-money-green"
                                 >
                                     Home
