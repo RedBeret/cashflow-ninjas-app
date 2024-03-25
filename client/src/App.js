@@ -37,7 +37,7 @@ export default function App() {
         <Router>
             <NavbarMenu />
             <Switch>
-                <Route exact path="/" component={Home} />
+                <Route exact path="/cashflow-ninjas-app" component={Home} />
                 <Route path="/about" component={About} />
                 <Route path="/auth" component={AuthPages} />
                 <Route path="/contact" component={Contact} />
