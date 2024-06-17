@@ -64,13 +64,13 @@ SQLAlchemy==2.0.25
 SQLAlchemy-serializer==1.4.1
 stack-data==0.6.3
 toml==0.10.2
-tqdm==4.66.1
+tqdm==4.66.3
 traitlets==5.14.1
 typing_extensions==4.9.0
 wcwidth==0.2.13
 Werkzeug==3.0.1
 tzdata==2023.3
-urllib3==2.0.7
+urllib3==2.2.2
 virtualenv==20.24.5
 webencodings==0.5.1
 yapf==0.40.2
