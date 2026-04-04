@@ -1,5 +1,8 @@
 # Money Magnet Financial Wellness App - Hackonomics 2024
 
+![JavaScript](https://img.shields.io/badge/JavaScript-yellow?logo=javascript&logoColor=black) ![GitHub stars](https://img.shields.io/github/stars/RedBeret/cashflow-ninjas-app?style=social)
+
+
 ## Hackathon Overview
 
 Part of Hackonomics 2024 hosted by Flatiron School, the Money Magnet Financial Wellness App project was embarked upon with a clear and compelling challenge: to revolutionize personal finance management through AI/ML-driven solutions.
